@@ -1,5 +1,9 @@
 import type { Difficulty, PlayerProfile } from '@pk/shared';
-import { DEFAULT_TEAM_SIZE, getDifficultyConfig } from '@pk/shared';
+import {
+  getDifficultyConfig,
+  TEAM_KEEPS_PER_PLAYER,
+  TEAM_KICKS_PER_PLAYER,
+} from '@pk/shared';
 import type { TurnSnapshot } from './state';
 import { GameStateMachine } from './state';
 import { createAiOpponent } from './ai';
@@ -10,9 +14,12 @@ export interface TeamTurnInfo {
   leg: 'first' | 'second';
   teamAScore: number;
   teamBScore: number;
+  teamNameA: string;
+  teamNameB: string;
   activeKicker: PlayerProfile;
   activeKeeper: PlayerProfile;
   playerControls: 'kicker' | 'keeper';
+  duelLabel: string;
 }
 
 export interface TeamSnapshot extends TurnSnapshot {
@@ -22,19 +29,37 @@ export interface TeamSnapshot extends TurnSnapshot {
 export interface TeamMatchConfig {
   teamA: PlayerProfile[];
   teamB: PlayerProfile[];
+  teamNameA: string;
+  teamNameB: string;
   difficulty: Difficulty;
   onTurnResolved: (snap: TeamSnapshot) => void;
   onMatchComplete: (snap: TeamSnapshot) => void;
 }
 
-function buildTurnOrder(teamSize: number): Array<{ kickerTeam: 'A' | 'B'; slot: number }> {
-  const turns: Array<{ kickerTeam: 'A' | 'B'; slot: number }> = [];
-  for (let i = 0; i < teamSize; i++) {
-    turns.push({ kickerTeam: 'A', slot: i });
-  }
-  for (let i = 0; i < teamSize; i++) {
-    turns.push({ kickerTeam: 'B', slot: i });
-  }
+interface TurnSpec {
+  kickerTeam: 'A' | 'B';
+  slot: number;
+  leg: 'first' | 'second';
+  duelType: 'kick' | 'keep';
+}
+
+function buildTurnOrder(teamSize: number): TurnSpec[] {
+  const turns: TurnSpec[] = [];
+
+  const addLeg = (leg: 'first' | 'second', kickerTeam: 'A' | 'B') => {
+    for (let slot = 0; slot < teamSize; slot++) {
+      for (let i = 0; i < TEAM_KICKS_PER_PLAYER; i++) {
+        turns.push({ kickerTeam, slot, leg, duelType: 'kick' });
+      }
+      const keeperTeam = kickerTeam === 'A' ? 'B' : 'A';
+      for (let i = 0; i < TEAM_KEEPS_PER_PLAYER; i++) {
+        turns.push({ kickerTeam: keeperTeam, slot, leg, duelType: 'keep' });
+      }
+    }
+  };
+
+  addLeg('first', 'A');
+  addLeg('second', 'B');
   return turns;
 }
 
@@ -42,7 +67,9 @@ export class TeamStateMachine {
   readonly duel: GameStateMachine;
   private teamA: PlayerProfile[];
   private teamB: PlayerProfile[];
-  private turnOrder: Array<{ kickerTeam: 'A' | 'B'; slot: number }>;
+  private teamNameA: string;
+  private teamNameB: string;
+  private turnOrder: TurnSpec[];
   private turnIndex = 0;
   private teamAScore = 0;
   private teamBScore = 0;
@@ -52,6 +79,8 @@ export class TeamStateMachine {
     this.config = config;
     this.teamA = config.teamA;
     this.teamB = config.teamB;
+    this.teamNameA = config.teamNameA;
+    this.teamNameB = config.teamNameB;
     this.turnOrder = buildTurnOrder(config.teamA.length);
 
     const first = this.currentPairing();
@@ -67,12 +96,7 @@ export class TeamStateMachine {
       onMatchComplete: () => this.tryAdvanceTeam(),
     });
 
-    this.duel.snapshot.playerRole = first.playerControls === 'kicker' ? 'shooter' : 'keeper';
-    this.duel.snapshot.activeKicker = first.kicker;
-    this.duel.snapshot.activeKeeper = first.keeper;
-    this.duel.snapshot.isComplete = false;
-    this.duel.snapshot.round = 1;
-    this.duel.snapshot.score = { player: 0, opponent: 0 };
+    this.applyPairingToDuel(first);
   }
 
   get snapshot(): TeamSnapshot {
@@ -89,21 +113,37 @@ export class TeamStateMachine {
     const kicker = (kickerTeam === 'A' ? this.teamA : this.teamB)[turn.slot]!;
     const keeper = (keeperTeam === 'A' ? this.teamA : this.teamB)[turn.slot]!;
     const playerControls: 'kicker' | 'keeper' = kickerTeam === 'A' ? 'kicker' : 'keeper';
-    return { kicker, keeper, playerControls, kickerTeam };
+    return { kicker, keeper, playerControls, kickerTeam, turn };
   }
 
   private buildTeamInfo(): TeamTurnInfo {
     const pairing = this.currentPairing();
+
     return {
       turnIndex: this.turnIndex + 1,
       totalTurns: this.turnOrder.length,
-      leg: this.turnIndex < this.teamA.length ? 'first' : 'second',
+      leg: pairing.turn.leg,
       teamAScore: this.teamAScore,
       teamBScore: this.teamBScore,
+      teamNameA: this.teamNameA,
+      teamNameB: this.teamNameB,
       activeKicker: pairing.kicker,
       activeKeeper: pairing.keeper,
       playerControls: pairing.playerControls,
+      duelLabel:
+        pairing.turn.duelType === 'kick'
+          ? `${pairing.kicker.name} kicking`
+          : `${pairing.keeper.name} keeping`,
     };
+  }
+
+  private applyPairingToDuel(pairing: ReturnType<typeof this.currentPairing>): void {
+    this.duel.snapshot.playerRole = pairing.playerControls === 'kicker' ? 'shooter' : 'keeper';
+    this.duel.snapshot.activeKicker = pairing.kicker;
+    this.duel.snapshot.activeKeeper = pairing.keeper;
+    this.duel.snapshot.isComplete = false;
+    this.duel.snapshot.round = this.turnIndex + 1;
+    this.duel.snapshot.score = { player: this.teamAScore, opponent: this.teamBScore };
   }
 
   update(dt: number): void {
@@ -151,10 +191,7 @@ export class TeamStateMachine {
       singleDuel: true,
     });
 
-    this.duel.snapshot.playerRole = pairing.playerControls === 'kicker' ? 'shooter' : 'keeper';
-    this.duel.snapshot.activeKicker = pairing.kicker;
-    this.duel.snapshot.activeKeeper = pairing.keeper;
-    this.duel.snapshot.isComplete = false;
+    this.applyPairingToDuel(pairing);
   }
 
   private finishTeamMatch(): void {
@@ -165,8 +202,4 @@ export class TeamStateMachine {
     else s.winner = 'draw';
     this.config.onMatchComplete(this.snapshot);
   }
-}
-
-export function defaultTeamSize(): number {
-  return DEFAULT_TEAM_SIZE;
 }

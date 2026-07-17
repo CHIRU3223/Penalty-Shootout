@@ -24,13 +24,26 @@ export function HowToPlay({ onBack }: HowToPlayProps) {
         </section>
         <section>
           <h3 className="font-semibold text-white">1v1 Mode</h3>
-          <p>5 rounds alternating kicker/keeper roles. Tied? Sudden death duels until someone leads.</p>
+          <p>
+            10 duels total — you kick 5 times and keep 5 times (roles alternate each duel). Tied
+            after all 10? Sudden death until someone leads.
+          </p>
         </section>
         <section>
-          <h3 className="font-semibold text-white">Team Mode (3v3)</h3>
+          <h3 className="font-semibold text-white">Team Mode Online</h3>
           <p>
-            Set up 3 players with names and flags. Each player kicks once against an AI keeper, then
-            each AI player kicks against your keepers. Most team points wins.
+            From Team Setup choose &quot;Invite Online&quot; to create a room code. Teammates use
+            Join Team Room on the main menu, claim a slot, and ready up. Everyone on your team
+            picks zones when it is their kick or keep turn.
+          </p>
+        </section>
+        <section>
+          <h3 className="font-semibold text-white">Team Mode (Local)</h3>
+          <p>
+            Pick any squad size (1–8 players). For odd counts you can optionally add a famous
+            AI teammate, or turn that off and fill every slot with friends online. Name your team
+            and each player. Every squad member kicks twice and keeps twice. First leg: your team
+            attacks; return leg: opponents attack. Most team points wins.
           </p>
         </section>
         <section>

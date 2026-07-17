@@ -86,10 +86,20 @@ export interface MatchState {
 
 export const ZONE_ROWS = 3;
 export const ZONE_COLS = 3;
-export const MAX_ROUNDS = 5;
+/** Kicks (or keeps) per side in 1v1 / online — 5 each = 10 duels total */
+export const ROUNDS_PER_ROLE = 5;
+export const MAX_DUELS = ROUNDS_PER_ROLE * 2;
+/** @deprecated use MAX_DUELS */
+export const MAX_ROUNDS = MAX_DUELS;
 export const SHOT_CLOCK_SECONDS = 8;
 export const PICK_CLOCK_SECONDS = 10;
-export const DEFAULT_TEAM_SIZE = 3;
+export const TEAM_KICKS_PER_PLAYER = 2;
+export const TEAM_KEEPS_PER_PLAYER = 2;
+export const MIN_TEAM_PLAYERS = 1;
+export const MAX_TEAM_PLAYERS = 8;
+export const DEFAULT_TEAM_PLAYERS = 3;
+/** @deprecated use DEFAULT_TEAM_PLAYERS */
+export const DEFAULT_TEAM_SIZE = DEFAULT_TEAM_PLAYERS;
 
 export function zoneToRowCol(zone: Zone): { row: number; col: number } {
   return { row: Math.floor(zone / ZONE_COLS), col: zone % ZONE_COLS };

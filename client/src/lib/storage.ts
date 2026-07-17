@@ -1,5 +1,12 @@
 import type { PlayerProfile, PlayerStats, TeamId } from '@pk/shared';
-import { defaultFlagId } from '@pk/shared';
+import {
+  defaultFlagId,
+  MAX_TEAM_PLAYERS,
+  MIN_TEAM_PLAYERS,
+  pickFamousFootballerNames,
+  TEAM_KEEPS_PER_PLAYER,
+  TEAM_KICKS_PER_PLAYER,
+} from '@pk/shared';
 
 const PROFILE_KEY = 'pk-profile';
 const STATS_KEY = 'pk-stats';
@@ -10,10 +17,15 @@ export interface SavedTeamSlot {
   slot: number;
   name: string;
   flagId: string;
+  isAi?: boolean;
 }
 
 export interface SavedTeam {
+  humanCount: number;
   teamSize: number;
+  includeAiTeammate: boolean;
+  teamNameA: string;
+  teamNameB: string;
   slots: SavedTeamSlot[];
 }
 
@@ -94,38 +106,141 @@ export function recordMatchResult(
   return stats;
 }
 
-export function loadTeam(teamSize = 3): SavedTeam {
+export function clampHumanCount(count: number): number {
+  return Math.max(MIN_TEAM_PLAYERS, Math.min(MAX_TEAM_PLAYERS, Math.floor(count)));
+}
+
+export function canOfferAiTeammate(humanCount: number): boolean {
+  return clampHumanCount(humanCount) % 2 === 1;
+}
+
+/** Team size for match — odd squads can optionally add one AI teammate */
+export function resolveTeamSize(humanCount: number, includeAiTeammate = true): number {
+  const humans = clampHumanCount(humanCount);
+  if (humans % 2 === 0) return humans;
+  return includeAiTeammate ? humans + 1 : humans;
+}
+
+export function aiSlotsNeeded(humanCount: number, includeAiTeammate = true): number {
+  return resolveTeamSize(humanCount, includeAiTeammate) - clampHumanCount(humanCount);
+}
+
+export function buildTeamSlots(
+  humanCount: number,
+  includeAiTeammate: boolean,
+  existing?: SavedTeam,
+): SavedTeamSlot[] {
+  const humans = clampHumanCount(humanCount);
+  const aiCount = aiSlotsNeeded(humans, includeAiTeammate);
+  const profile = loadProfile();
+  const aiNames = pickFamousFootballerNames(aiCount);
+  const flags = ['de', 'fr', 'es', 'it', 'pt', 'nl', 'ar', 'us'];
+
+  const slots: SavedTeamSlot[] = [];
+  for (let i = 0; i < humans; i++) {
+    const prev = existing?.slots.find((s) => s.slot === i && !s.isAi);
+    slots.push({
+      slot: i,
+      name: prev?.name ?? (i === 0 ? profile.name : `Player ${i + 1}`),
+      flagId: prev?.flagId ?? (i === 0 ? profile.flagId : defaultFlagId()),
+      isAi: false,
+    });
+  }
+  for (let i = 0; i < aiCount; i++) {
+    const slotIndex = humans + i;
+    const prev = existing?.slots.find((s) => s.slot === slotIndex && s.isAi);
+    slots.push({
+      slot: slotIndex,
+      name: prev?.name ?? aiNames[i]!,
+      flagId: prev?.flagId ?? flags[slotIndex % flags.length]!,
+      isAi: true,
+    });
+  }
+  return slots;
+}
+
+export function loadTeam(humanCount = 3, includeAiTeammate?: boolean): SavedTeam {
+  const humans = clampHumanCount(humanCount);
   try {
     const raw = localStorage.getItem(TEAM_KEY);
     if (raw) {
       const parsed = JSON.parse(raw) as SavedTeam;
-      if (parsed.teamSize === teamSize) return parsed;
+      const aiPref =
+        includeAiTeammate ??
+        (parsed.includeAiTeammate ?? canOfferAiTeammate(humans));
+      if (parsed.humanCount === humans) {
+        return normalizeSavedTeam(parsed, humans, aiPref);
+      }
     }
   } catch {
     /* ignore */
   }
-  const profile = loadProfile();
-  const slots: SavedTeamSlot[] = Array.from({ length: teamSize }, (_, i) => ({
-    slot: i,
-    name: i === 0 ? profile.name : `Player ${i + 1}`,
-    flagId: i === 0 ? profile.flagId : defaultFlagId(),
-  }));
-  return { teamSize, slots };
+  const aiPref = includeAiTeammate ?? canOfferAiTeammate(humans);
+  return createDefaultTeam(humans, aiPref);
+}
+
+function createDefaultTeam(humanCount: number, includeAiTeammate: boolean): SavedTeam {
+  const humans = clampHumanCount(humanCount);
+  const teamSize = resolveTeamSize(humans, includeAiTeammate);
+
+  return {
+    humanCount: humans,
+    teamSize,
+    includeAiTeammate: canOfferAiTeammate(humans) ? includeAiTeammate : false,
+    teamNameA: 'Your Team',
+    teamNameB: 'AI United',
+    slots: buildTeamSlots(humans, includeAiTeammate),
+  };
+}
+
+function normalizeSavedTeam(
+  saved: SavedTeam,
+  humanCount: number,
+  includeAiTeammate: boolean,
+): SavedTeam {
+  const humans = clampHumanCount(humanCount);
+  const useAi = canOfferAiTeammate(humans) ? includeAiTeammate : false;
+  const teamSize = resolveTeamSize(humans, useAi);
+
+  return {
+    humanCount: humans,
+    teamSize,
+    includeAiTeammate: useAi,
+    teamNameA: saved.teamNameA || 'Your Team',
+    teamNameB: saved.teamNameB || 'AI United',
+    slots: buildTeamSlots(humans, useAi, saved),
+  };
 }
 
 export function saveTeam(team: SavedTeam): void {
   localStorage.setItem(TEAM_KEY, JSON.stringify(team));
 }
 
-export function createAiTeam(teamSize: number, teamId: TeamId): PlayerProfile[] {
-  const names =
-    teamId === 'A'
-      ? ['AI Ace', 'AI Bolt', 'AI Stark', 'AI Flash', 'AI Hawk']
-      : ['Bot Max', 'Bot Rex', 'Bot Zed', 'Bot Kai', 'Bot Nova'];
+export function savedTeamToProfiles(team: SavedTeam): PlayerProfile[] {
+  return team.slots.map((slot) => ({
+    id: slot.isAi ? `ai-a-${slot.slot}` : `human-a-${slot.slot}`,
+    name: slot.name,
+    flagId: slot.flagId,
+  }));
+}
+
+export function createAiOpponentTeam(teamSize: number, teamId: TeamId = 'B'): PlayerProfile[] {
+  const names = pickFamousFootballerNames(teamSize);
   const flags = ['de', 'fr', 'es', 'it', 'pt', 'nl', 'ar', 'us'];
   return Array.from({ length: teamSize }, (_, i) => ({
     id: `ai-${teamId}-${i}`,
-    name: names[i] ?? `AI ${i + 1}`,
+    name: names[i]!,
     flagId: flags[i % flags.length]!,
   }));
+}
+
+/** @deprecated use createAiOpponentTeam */
+export const createAiTeam = createAiOpponentTeam;
+
+export function teamDuelsPerSide(teamSize: number): number {
+  return teamSize * (TEAM_KICKS_PER_PLAYER + TEAM_KEEPS_PER_PLAYER);
+}
+
+export function totalTeamDuels(teamSize: number): number {
+  return teamDuelsPerSide(teamSize) * 2;
 }

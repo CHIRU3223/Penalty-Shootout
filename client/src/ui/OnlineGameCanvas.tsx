@@ -1,5 +1,6 @@
 import { useEffect, useRef } from 'react';
 import type { PlayerRole, ServerToClientMessage } from '@pk/shared';
+import { MAX_DUELS } from '@pk/shared';
 import {
   createCameraState,
   getActiveLayout,
@@ -80,7 +81,7 @@ export function OnlineGameCanvas({ active }: OnlineGameCanvasProps) {
       const s = machine.snapshot;
       setHud({
         round: s.round,
-        maxRounds: 5,
+        maxRounds: MAX_DUELS,
         playerRole: s.playerRole,
         score: s.score,
         pickClock: s.pickClock,

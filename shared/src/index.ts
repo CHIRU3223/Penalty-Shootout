@@ -4,5 +4,7 @@ export * from './difficulty.js';
 export * from './scoring.js';
 export * from './duel.js';
 export * from './flags.js';
+export * from './footballers.js';
 export * from './ai.js';
 export * from './matchEngine.js';
+export * from './teamEngine.js';

@@ -1,5 +1,5 @@
 import { useEffect, useRef } from 'react';
-import { getDifficultyConfig, type PlayerRole } from '@pk/shared';
+import { getDifficultyConfig, MAX_DUELS, type PlayerRole } from '@pk/shared';
 import {
   createCameraState,
   getActiveLayout,
@@ -78,7 +78,7 @@ export function GameCanvas({ active }: GameCanvasProps) {
       const s = machine.snapshot;
       setHud({
         round: s.round,
-        maxRounds: 5,
+        maxRounds: MAX_DUELS,
         playerRole: s.playerRole,
         score: s.score,
         pickClock: s.pickClock,

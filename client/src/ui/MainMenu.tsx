@@ -4,6 +4,7 @@ import { loadProfile } from '../lib/storage';
 interface MainMenuProps {
   onPlaySolo: () => void;
   onPlayTeam: () => void;
+  onJoinTeam: () => void;
   onPlayOnline: () => void;
   onProfile: () => void;
   onHowTo: () => void;
@@ -13,6 +14,7 @@ interface MainMenuProps {
 export function MainMenu({
   onPlaySolo,
   onPlayTeam,
+  onJoinTeam,
   onPlayOnline,
   onProfile,
   onHowTo,
@@ -50,7 +52,14 @@ export function MainMenu({
           onClick={onPlayTeam}
           className="rounded-full border border-gold/60 px-10 py-4 text-lg font-semibold text-gold transition hover:bg-gold/10"
         >
-          Team Mode (3v3)
+          Team Mode
+        </button>
+        <button
+          type="button"
+          onClick={onJoinTeam}
+          className="rounded-full border border-slate-600 px-10 py-4 text-lg font-semibold text-slate-200 transition hover:bg-slate-800"
+        >
+          Join Team Room
         </button>
         <button
           type="button"

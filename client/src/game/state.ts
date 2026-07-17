@@ -2,7 +2,7 @@ import type { DifficultyConfig, DuelPoint, PlayerProfile, PlayerRole, Zone } fro
 import {
   computeZoneDuel,
   duelPointLabel,
-  MAX_ROUNDS,
+  MAX_DUELS,
   PICK_CLOCK_SECONDS,
 } from '@pk/shared';
 
@@ -249,10 +249,10 @@ export class GameStateMachine {
 
     if (!s.isSuddenDeath) {
       s.round += 1;
-      if (s.round > MAX_ROUNDS) {
+      if (s.round > MAX_DUELS) {
         if (s.score.player === s.score.opponent) {
           s.isSuddenDeath = true;
-          s.round = MAX_ROUNDS + 1;
+          s.round = MAX_DUELS + 1;
         } else {
           this.finishMatch();
           return;
@@ -300,7 +300,7 @@ export class GameStateMachine {
   private checkMatchEnd(): void {
     const s = this.snapshot;
     if (s.isSuddenDeath) return;
-    const remaining = MAX_ROUNDS - s.round;
+    const remaining = MAX_DUELS - s.round;
     const playerLead = s.score.player - s.score.opponent;
     const opponentLead = s.score.opponent - s.score.player;
     if (playerLead > remaining || opponentLead > remaining) {

@@ -1,5 +1,5 @@
 import { useEffect, useRef } from 'react';
-import type { PlayerRole } from '@pk/shared';
+import type { PlayerRole, ServerToClientMessage, TeamTurnStartMessage } from '@pk/shared';
 import {
   createCameraState,
   getActiveLayout,
@@ -7,13 +7,14 @@ import {
   setCameraRole,
 } from '../game/camera';
 import { createBallState } from '../game/ball';
-import { createInputHandlers } from '../game/input';
 import { computeFps, createGameLoop } from '../game/loop';
 import {
   createKeeperState,
   resetKeeper,
   syncKeeperLayout,
 } from '../game/keeper';
+import { createOnlineTeamInputHandlers } from '../game/onlineTeamInput';
+import { OnlineTeamStateMachine } from '../game/onlineTeamState';
 import { drawDuelFlash, drawFrame } from '../game/renderer';
 import { playSound } from '../game/sounds';
 import {
@@ -22,24 +23,17 @@ import {
   syncStrikerLayout,
 } from '../game/striker';
 import { handleDuelAnimUpdate, resetDuelEntities, syncCameraToRole } from '../game/duelAnimations';
-import { TeamStateMachine } from '../game/teamState';
+import { onServerMessage, sendMessage } from '../net/socketClient';
 import { useAppStore } from '../store/appStore';
-import {
-  createAiOpponentTeam,
-  loadTeam,
-  recordMatchResult,
-  savedTeamToProfiles,
-} from '../lib/storage';
+import { loadProfile, recordMatchResult } from '../lib/storage';
 
-interface TeamGameCanvasProps {
+interface OnlineTeamGameCanvasProps {
   active: boolean;
 }
 
-export function TeamGameCanvas({ active }: TeamGameCanvasProps) {
+export function OnlineTeamGameCanvas({ active }: OnlineTeamGameCanvasProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
-  const difficulty = useAppStore((s) => s.difficulty);
-  const humanCount = useAppStore((s) => s.humanCount);
   const setHud = useAppStore((s) => s.setHud);
   const setWinner = useAppStore((s) => s.setWinner);
   const setScreen = useAppStore((s) => s.setScreen);
@@ -55,10 +49,7 @@ export function TeamGameCanvas({ active }: TeamGameCanvasProps) {
     const ctx = canvas.getContext('2d');
     if (!ctx) return;
 
-    const saved = loadTeam(humanCount);
-    const teamA = savedTeamToProfiles(saved);
-    const teamB = createAiOpponentTeam(saved.teamSize, 'B');
-
+    const playerProfile = loadProfile();
     const ball = createBallState();
     const anim = { animStarted: false };
     const lastRole = { value: 'shooter' as PlayerRole };
@@ -79,12 +70,45 @@ export function TeamGameCanvas({ active }: TeamGameCanvasProps) {
       false,
     );
 
-    const machine = new TeamStateMachine({
-      teamA,
-      teamB,
-      teamNameA: saved.teamNameA,
-      teamNameB: saved.teamNameB,
-      difficulty,
+    const deltaSamples: number[] = [];
+    let lastHudClock = -1;
+    let pendingTurnStart: TeamTurnStartMessage | null = null;
+
+    const applyTurnStart = (msg: TeamTurnStartMessage) => {
+      machine.initFromTurnStart(msg);
+      syncHud();
+    };
+
+    const syncHud = () => {
+      const s = machine.snapshot;
+      setHud({
+        round: s.turnIndex,
+        maxRounds: s.totalTurns,
+        playerRole: s.playerRole,
+        score: s.score,
+        pickClock: s.pickClock,
+        lastPoint: s.lastPoint,
+        phase: s.phase,
+        isSuddenDeath: false,
+        activeKicker: s.activeKicker,
+        activeKeeper: s.activeKeeper,
+        playerProfile,
+        opponentProfile: s.activeKeeper,
+        teamMode: true,
+        teamLeg: s.teamLeg,
+        teamNameA: s.teamNameA,
+        teamNameB: s.teamNameB,
+        playerControls:
+          s.yourRole === 'spectator'
+            ? null
+            : s.yourRole === 'shooter'
+              ? 'kicker'
+              : 'keeper',
+      });
+    };
+
+    const machine = new OnlineTeamStateMachine({
+      onSubmitPick: (zone) => sendMessage({ type: 'submit_team_zone_pick', zone }),
       onTurnResolved: () => {
         syncHud();
         if (soundEnabled) {
@@ -96,46 +120,14 @@ export function TeamGameCanvas({ active }: TeamGameCanvasProps) {
       onMatchComplete: (snap) => {
         syncHud();
         const won = snap.winner === 'player';
-        recordMatchResult(
-          won,
-          snap.teamInfo.teamAScore,
-          snap.teamInfo.teamBScore,
-          true,
-        );
+        recordMatchResult(won, snap.score.player, snap.score.opponent, true);
         if (snap.winner) setWinner(snap.winner);
         window.setTimeout(() => setScreen('result'), 1200);
       },
     });
 
-    const syncHud = () => {
-      const s = machine.snapshot;
-      const info = s.teamInfo;
-      setHud({
-        round: info.turnIndex,
-        maxRounds: info.totalTurns,
-        playerRole: s.playerRole,
-        score: { player: info.teamAScore, opponent: info.teamBScore },
-        pickClock: s.pickClock,
-        lastPoint: s.lastPoint,
-        phase: s.phase,
-        isSuddenDeath: false,
-        activeKicker: info.activeKicker,
-        activeKeeper: info.activeKeeper,
-        playerProfile: teamA[0]!,
-        opponentProfile: teamB[0]!,
-        teamMode: true,
-        teamLeg: info.leg,
-        teamNameA: info.teamNameA,
-        teamNameB: info.teamNameB,
-        playerControls: info.playerControls,
-      });
-    };
-
-    const input = createInputHandlers(() => layout, machine.duel, syncHud);
+    const input = createOnlineTeamInputHandlers(() => layout, machine, syncHud);
     input.attach(canvas);
-
-    const deltaSamples: number[] = [];
-    let lastHudClock = -1;
 
     const applyLayoutToEntities = () => {
       layout = getActiveLayout(camera);
@@ -162,12 +154,41 @@ export function TeamGameCanvas({ active }: TeamGameCanvasProps) {
       resetStriker(opponentStriker);
     };
 
+    const offMsg = onServerMessage((msg: ServerToClientMessage) => {
+      if (msg.type === 'team_turn_start') {
+        const snap = machine.snapshot;
+        if (snap.phase === 'REVEAL' || snap.phase === 'RESOLVE' || snap.phase === 'NEXT_TURN') {
+          pendingTurnStart = msg;
+        } else {
+          applyTurnStart(msg);
+        }
+      } else if (msg.type === 'team_turn_result') {
+        machine.applyTurnResult(msg);
+        syncHud();
+      } else if (msg.type === 'team_match_end') {
+        machine.finishMatch(msg);
+        syncHud();
+      } else if (msg.type === 'opponent_disconnected') {
+        setScreen('team_lobby');
+      }
+    });
+
     const loop = createGameLoop({
       update(dt) {
         deltaSamples.push(dt);
         if (deltaSamples.length > 30) deltaSamples.shift();
 
         machine.update(dt);
+
+        if (
+          pendingTurnStart &&
+          machine.snapshot.phase === 'PICK' &&
+          !machine.snapshot.lastPoint &&
+          !machine.snapshot.playerLocked
+        ) {
+          applyTurnStart(pendingTurnStart);
+          pendingTurnStart = null;
+        }
 
         const s = machine.snapshot;
 
@@ -239,9 +260,10 @@ export function TeamGameCanvas({ active }: TeamGameCanvasProps) {
     return () => {
       loop.stop();
       input.detach();
+      offMsg();
       observer.disconnect();
     };
-  }, [active, difficulty, humanCount, setHud, setScreen, setWinner, soundEnabled]);
+  }, [active, setHud, setScreen, setWinner, soundEnabled]);
 
   return (
     <div ref={containerRef} className="relative h-full min-h-[420px] w-full flex-1">

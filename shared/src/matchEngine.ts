@@ -1,5 +1,5 @@
 import type { DuelPoint, MatchScore, PlayerRole, Zone } from './types.js';
-import { MAX_ROUNDS } from './types.js';
+import { MAX_DUELS } from './types.js';
 import { computeZoneDuel } from './duel.js';
 
 export type MatchSide = 'host' | 'guest';
@@ -100,7 +100,7 @@ export function applyTurnToMatch(
   state.pendingKeepZone = null;
 
   if (!state.isSuddenDeath) {
-    const remaining = MAX_ROUNDS - state.round;
+    const remaining = MAX_DUELS - state.round;
     const hostLead = state.score.host - state.score.guest;
     const guestLead = state.score.guest - state.score.host;
     if (hostLead > remaining || guestLead > remaining) {
@@ -124,10 +124,10 @@ function advanceOnlineTurn(state: OnlineMatchState): void {
 
   if (!state.isSuddenDeath) {
     state.round += 1;
-    if (state.round > MAX_ROUNDS) {
+    if (state.round > MAX_DUELS) {
       if (state.score.host === state.score.guest) {
         state.isSuddenDeath = true;
-        state.round = MAX_ROUNDS + 1;
+        state.round = MAX_DUELS + 1;
       } else {
         finishOnlineMatch(state);
         return;

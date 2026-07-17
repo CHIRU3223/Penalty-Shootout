@@ -2,30 +2,45 @@ interface ResultScreenProps {
   score: { player: number; opponent: number };
   winner: 'player' | 'opponent' | 'draw';
   teamMode?: boolean;
+  teamNameA?: string | null;
+  teamNameB?: string | null;
   onRematch: () => void;
   onMenu: () => void;
 }
 
-export function ResultScreen({ score, winner, teamMode, onRematch, onMenu }: ResultScreenProps) {
+export function ResultScreen({
+  score,
+  winner,
+  teamMode,
+  teamNameA,
+  teamNameB,
+  onRematch,
+  onMenu,
+}: ResultScreenProps) {
+  const yourTeam = teamNameA ?? 'Your Team';
+  const oppTeam = teamNameB ?? 'Opponents';
+
   const headline =
     winner === 'player'
       ? teamMode
-        ? 'Team Wins!'
+        ? `${yourTeam} Wins!`
         : 'You Win!'
       : winner === 'opponent'
         ? teamMode
-          ? 'Team Loses'
+          ? `${yourTeam} Loses`
           : 'You Lose'
         : 'Draw';
+
+  const scoreLine = teamMode
+    ? `${yourTeam} ${score.player} – ${score.opponent} ${oppTeam}`
+    : `${score.player} – ${score.opponent}`;
 
   return (
     <div className="flex flex-col items-center gap-8 px-6 text-center">
       <div>
         <p className="mb-2 text-sm uppercase tracking-[0.35em] text-gold">Full Time</p>
         <h2 className="font-display text-4xl font-bold sm:text-5xl">{headline}</h2>
-        <p className="mt-4 font-display text-3xl tabular-nums">
-          {score.player} – {score.opponent}
-        </p>
+        <p className="mt-4 font-display text-3xl tabular-nums">{scoreLine}</p>
       </div>
       <div className="flex w-full max-w-sm flex-col gap-3 sm:flex-row">
         <button

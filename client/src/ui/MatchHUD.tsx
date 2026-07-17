@@ -1,4 +1,5 @@
 import type { DuelPoint, PlayerRole } from '@pk/shared';
+import { MAX_DUELS } from '@pk/shared';
 import { profileLabel } from '../store/appStore';
 import type { PlayerProfile } from '@pk/shared';
 
@@ -18,6 +19,8 @@ interface MatchHUDProps {
   opponentProfile: PlayerProfile | null;
   teamMode?: boolean;
   teamLeg?: 'first' | 'second' | null;
+  teamNameA?: string | null;
+  teamNameB?: string | null;
   playerControls?: 'kicker' | 'keeper' | null;
   online?: boolean;
 }
@@ -37,6 +40,8 @@ export function MatchHUD({
   playerProfile,
   teamMode = false,
   teamLeg,
+  teamNameA,
+  teamNameB,
   playerControls,
   online = false,
 }: MatchHUDProps) {
@@ -58,11 +63,27 @@ export function MatchHUD({
     ? `Duel ${round} / ${maxRounds}${teamLeg === 'second' ? ' · Return leg' : ''}`
     : isSuddenDeath
       ? 'Sudden Death'
-      : `Round ${Math.min(round, maxRounds)} / ${maxRounds}`;
+      : `Duel ${Math.min(round, maxRounds)} / ${maxRounds}`;
 
-  const scoreLabel = teamMode
-    ? `Team ${score.player} – ${score.opponent} AI`
-    : `You ${score.player} – ${score.opponent} ${online ? 'Opp' : 'AI'}`;
+  const yourLabel = teamMode ? (teamNameA ?? 'Your Team') : 'You';
+  const oppLabel = teamMode
+    ? (teamNameB ?? 'Opponents')
+    : online
+      ? 'Opp'
+      : 'AI';
+
+  const scoreLabel = `${yourLabel} ${score.player} – ${score.opponent} ${oppLabel}`;
+
+  const roleHint = teamMode && !playerControls
+    ? 'Watching · wait for your turn'
+    : teamMode && playerControls
+      ? `You: ${playerControls.toUpperCase()}`
+      : roleLabel;
+
+  const kickKeepHint =
+    !teamMode && maxRounds === MAX_DUELS
+      ? '5 kicks + 5 keeps each'
+      : null;
 
   return (
     <div className="pointer-events-none absolute inset-x-0 top-0 z-10 flex flex-col gap-3 p-4 sm:p-6">
@@ -70,6 +91,9 @@ export function MatchHUD({
         <div className="rounded-2xl bg-slate-950/70 px-4 py-3 backdrop-blur">
           <div className="text-xs uppercase tracking-widest text-slate-400">{roundLabel}</div>
           <div className="mt-1 font-display text-2xl font-bold">{scoreLabel}</div>
+          {kickKeepHint && (
+            <div className="mt-1 text-xs text-slate-500">{kickKeepHint}</div>
+          )}
           {activeKicker && activeKeeper && (
             <div className="mt-2 text-xs text-slate-400">
               {profileLabel(activeKicker)} kicks · {profileLabel(activeKeeper)} keeps
@@ -94,9 +118,7 @@ export function MatchHUD({
             </span>
           )}
           <span className="rounded-full bg-slate-950/70 px-4 py-2 text-sm backdrop-blur">
-            {teamMode && playerControls
-              ? `You: ${playerControls.toUpperCase()}`
-              : roleLabel}
+            {roleHint}
           </span>
         </div>
         <div className="rounded-full bg-slate-950/50 px-3 py-1 text-xs text-slate-400 backdrop-blur">

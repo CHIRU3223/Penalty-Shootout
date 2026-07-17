@@ -1,4 +1,12 @@
-import type { Difficulty, DuelPoint, PlayerProfile, PlayerRole } from '@pk/shared';
+import type {
+  CreateTeamLobbyMessage,
+  Difficulty,
+  DuelPoint,
+  PlayerProfile,
+  PlayerRole,
+  TeamLobbySlotState,
+} from '@pk/shared';
+import { MAX_DUELS } from '@pk/shared';
 import { getFlagById } from '@pk/shared';
 import { create } from 'zustand';
 
@@ -13,7 +21,9 @@ export type Screen =
   | 'settings'
   | 'howto'
   | 'profile'
-  | 'team_setup';
+  | 'team_setup'
+  | 'team_lobby'
+  | 'online_team_match';
 
 export type GameMode = 'solo' | 'online' | 'team';
 
@@ -33,7 +43,20 @@ export interface HudState {
   opponentProfile: PlayerProfile | null;
   teamMode: boolean;
   teamLeg: 'first' | 'second' | null;
+  teamNameA: string | null;
+  teamNameB: string | null;
   playerControls: 'kicker' | 'keeper' | null;
+}
+
+export interface TeamLobbyState {
+  code: string;
+  teamNameA: string;
+  teamNameB: string;
+  slots: TeamLobbySlotState[];
+  youAreHost: boolean;
+  yourSlot: number | null;
+  canStart: boolean;
+  difficulty: Difficulty;
 }
 
 export interface LobbyState {
@@ -48,18 +71,26 @@ interface AppStore {
   screen: Screen;
   gameMode: GameMode;
   difficulty: Difficulty;
-  teamSize: number;
+  humanCount: number;
   hud: HudState;
   lobby: LobbyState;
+  teamLobby: TeamLobbyState;
+  pendingTeamCreate: CreateTeamLobbyMessage | null;
+  teamInviteOnline: boolean;
+  teamOnline: boolean;
   winner: 'player' | 'opponent' | 'draw' | null;
   matchKey: number;
   soundEnabled: boolean;
   setScreen: (screen: Screen) => void;
   setGameMode: (mode: GameMode) => void;
   setDifficulty: (difficulty: Difficulty) => void;
-  setTeamSize: (size: number) => void;
+  setHumanCount: (count: number) => void;
   setHud: (hud: Partial<HudState>) => void;
   setLobby: (lobby: Partial<LobbyState>) => void;
+  setTeamLobby: (lobby: Partial<TeamLobbyState>) => void;
+  setPendingTeamCreate: (payload: CreateTeamLobbyMessage | null) => void;
+  setTeamInviteOnline: (online: boolean) => void;
+  setTeamOnline: (online: boolean) => void;
   setWinner: (winner: 'player' | 'opponent' | 'draw' | null) => void;
   setSoundEnabled: (enabled: boolean) => void;
   resetMatchMeta: () => void;
@@ -67,7 +98,7 @@ interface AppStore {
 
 const defaultHud: HudState = {
   round: 1,
-  maxRounds: 5,
+  maxRounds: MAX_DUELS,
   playerRole: 'shooter',
   score: { player: 0, opponent: 0 },
   pickClock: 10,
@@ -81,7 +112,20 @@ const defaultHud: HudState = {
   opponentProfile: null,
   teamMode: false,
   teamLeg: null,
+  teamNameA: null,
+  teamNameB: null,
   playerControls: null,
+};
+
+const defaultTeamLobby: TeamLobbyState = {
+  code: '',
+  teamNameA: 'Your Team',
+  teamNameB: 'Opponents',
+  slots: [],
+  youAreHost: false,
+  yourSlot: null,
+  canStart: false,
+  difficulty: 'intermediate',
 };
 
 const defaultLobby: LobbyState = {
@@ -96,18 +140,27 @@ export const useAppStore = create<AppStore>((set) => ({
   screen: 'menu',
   gameMode: 'solo',
   difficulty: 'intermediate',
-  teamSize: 3,
+  humanCount: 3,
   hud: defaultHud,
   lobby: defaultLobby,
+  teamLobby: defaultTeamLobby,
+  pendingTeamCreate: null,
+  teamInviteOnline: false,
+  teamOnline: false,
   winner: null,
   matchKey: 0,
   soundEnabled: localStorage.getItem('pk-sound') !== 'off',
   setScreen: (screen) => set({ screen }),
   setGameMode: (gameMode) => set({ gameMode }),
   setDifficulty: (difficulty) => set({ difficulty }),
-  setTeamSize: (teamSize) => set({ teamSize }),
+  setHumanCount: (humanCount) => set({ humanCount }),
   setHud: (hud) => set((state) => ({ hud: { ...state.hud, ...hud } })),
   setLobby: (lobby) => set((state) => ({ lobby: { ...state.lobby, ...lobby } })),
+  setTeamLobby: (teamLobby) =>
+    set((state) => ({ teamLobby: { ...state.teamLobby, ...teamLobby } })),
+  setPendingTeamCreate: (pendingTeamCreate) => set({ pendingTeamCreate }),
+  setTeamInviteOnline: (teamInviteOnline) => set({ teamInviteOnline }),
+  setTeamOnline: (teamOnline) => set({ teamOnline }),
   setWinner: (winner) => set({ winner }),
   setSoundEnabled: (soundEnabled) => {
     localStorage.setItem('pk-sound', soundEnabled ? 'on' : 'off');
