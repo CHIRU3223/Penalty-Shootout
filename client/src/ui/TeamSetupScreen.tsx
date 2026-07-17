@@ -86,8 +86,6 @@ export function TeamSetupScreen({ onBack, onContinue }: TeamSetupScreenProps) {
 
     setTeamNameB(saved.teamNameB);
 
-    setIncludeAiTeammate(saved.includeAiTeammate);
-
   }, [humanCount, includeAiTeammate]);
 
 
