@@ -216,12 +216,14 @@ function drawZoneGrid(
   ctx.save();
   ctx.globalAlpha = gridAlpha;
 
-  for (let z = 0; z < 9; z++) {
+  const zoneCount = layout.zoneRows * layout.zoneCols;
+  const cellW = layout.goalW / layout.zoneCols;
+  const cellH = layout.goalH / layout.zoneRows;
+
+  for (let z = 0; z < zoneCount; z++) {
     const zone = z as Zone;
-    const col = zone % 3;
-    const row = Math.floor(zone / 3);
-    const cellW = layout.goalW / 3;
-    const cellH = layout.goalH / 3;
+    const col = zone % layout.zoneCols;
+    const row = Math.floor(zone / layout.zoneCols);
     const x = layout.goalX + col * cellW;
     const y = layout.goalY + row * cellH;
     const pad = 6;

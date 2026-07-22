@@ -1,6 +1,6 @@
 import { useEffect, useRef } from 'react';
 import type { PlayerRole, ServerToClientMessage } from '@pk/shared';
-import { MAX_DUELS } from '@pk/shared';
+import { getZoneGrid, MAX_DUELS } from '@pk/shared';
 import {
   createCameraState,
   getActiveLayout,
@@ -57,7 +57,8 @@ export function OnlineGameCanvas({ active }: OnlineGameCanvasProps) {
     const ball = createBallState();
     const anim = { animStarted: false };
     const lastRole = { value: 'shooter' as PlayerRole };
-    let camera = createCameraState(canvas.width, canvas.height, 'shooter');
+    const zoneGrid = getZoneGrid('pro');
+    let camera = createCameraState(canvas.width, canvas.height, 'shooter', zoneGrid);
     let layout = getActiveLayout(camera);
 
     const keeper = createKeeperState(

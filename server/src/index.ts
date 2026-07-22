@@ -2,6 +2,8 @@ import { createServer } from 'node:http';
 import { Server } from 'socket.io';
 import {
   type ClientToServerMessage,
+  centerZone,
+  getZoneGrid,
   type Zone,
 } from '@pk/shared';
 import {
@@ -87,14 +89,17 @@ function startTurn(lobby: Lobby): void {
   startPickTimer(lobby, () => handlePickClock(lobby));
 }
 
+const ONLINE_ZONE_GRID = getZoneGrid('pro');
+
 function handlePickClock(lobby: Lobby): void {
   const { match } = lobby;
+  const defaultZone = centerZone(ONLINE_ZONE_GRID);
 
   if (match.pendingKickZone === null) {
-    match.pendingKickZone = 4 as Zone;
+    match.pendingKickZone = defaultZone;
   }
   if (match.pendingKeepZone === null) {
-    match.pendingKeepZone = 4 as Zone;
+    match.pendingKeepZone = defaultZone;
   }
 
   const msg = tryResolveTurn(lobby);
@@ -108,7 +113,7 @@ function handlePickClock(lobby: Lobby): void {
 }
 
 function validateZone(zone: number): zone is Zone {
-  return Number.isInteger(zone) && zone >= 0 && zone <= 8;
+  return Number.isInteger(zone) && zone >= 0 && zone < ONLINE_ZONE_GRID.rows * ONLINE_ZONE_GRID.cols;
 }
 
 function beginMatch(lobby: Lobby): void {
@@ -223,7 +228,7 @@ function handleTeamMessage(socketId: string, raw: ClientToServerMessage): boolea
 
     case 'submit_team_zone_pick': {
       if (!teamLobby || teamLobby.status !== 'playing' || !teamLobby.match) return true;
-      if (!validateTeamZone(raw.zone)) return true;
+      if (!validateTeamZone(raw.zone, teamLobby.difficulty)) return true;
 
       const controllers = getActivePickControllers(teamStore, teamLobby);
       const isKicker = controllers.kickerSocket === socketId;

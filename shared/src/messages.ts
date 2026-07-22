@@ -1,4 +1,5 @@
-import type { Difficulty, DuelPoint, PlayerProfile, Zone } from './types.js';
+import type { Difficulty, DuelPoint, PlayerProfile, Zone, ZoneGrid } from './types.js';
+import { isValidZone, PRO_ZONE_GRID } from './types.js';
 import type { MatchSide } from './matchEngine.js';
 import type { TeamSide } from './teamEngine.js';
 
@@ -233,9 +234,9 @@ export function isClientMessage(msg: SocketMessage): msg is ClientToServerMessag
   );
 }
 
-export function zoneFromPayload(zone: number): Zone | null {
-  if (Number.isInteger(zone) && zone >= 0 && zone <= 8) {
-    return zone as Zone;
+export function zoneFromPayload(zone: number, grid: ZoneGrid = PRO_ZONE_GRID): Zone | null {
+  if (isValidZone(zone, grid)) {
+    return zone;
   }
   return null;
 }

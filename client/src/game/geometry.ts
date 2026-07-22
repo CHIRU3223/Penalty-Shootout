@@ -1,4 +1,5 @@
-import type { Zone } from '@pk/shared';
+import type { Zone, ZoneGrid } from '@pk/shared';
+import { PRO_ZONE_GRID } from '@pk/shared';
 
 export type CameraMode = 'shooter' | 'keeper';
 
@@ -6,6 +7,8 @@ export interface Layout {
   width: number;
   height: number;
   mode: CameraMode;
+  zoneRows: number;
+  zoneCols: number;
   goalX: number;
   goalY: number;
   goalW: number;
@@ -22,7 +25,11 @@ export interface Layout {
   ballRadius: number;
 }
 
-export function computeShooterLayout(canvasWidth: number, canvasHeight: number): Layout {
+export function computeShooterLayout(
+  canvasWidth: number,
+  canvasHeight: number,
+  zoneGrid: ZoneGrid = PRO_ZONE_GRID,
+): Layout {
   const width = canvasWidth;
   const height = canvasHeight;
   const goalW = width * 0.78;
@@ -38,6 +45,8 @@ export function computeShooterLayout(canvasWidth: number, canvasHeight: number):
     width,
     height,
     mode: 'shooter',
+    zoneRows: zoneGrid.rows,
+    zoneCols: zoneGrid.cols,
     goalX,
     goalY,
     goalW,
@@ -55,7 +64,11 @@ export function computeShooterLayout(canvasWidth: number, canvasHeight: number):
   };
 }
 
-export function computeKeeperLayout(canvasWidth: number, canvasHeight: number): Layout {
+export function computeKeeperLayout(
+  canvasWidth: number,
+  canvasHeight: number,
+  zoneGrid: ZoneGrid = PRO_ZONE_GRID,
+): Layout {
   const width = canvasWidth;
   const height = canvasHeight;
   const goalW = width * 0.88;
@@ -71,6 +84,8 @@ export function computeKeeperLayout(canvasWidth: number, canvasHeight: number): 
     width,
     height,
     mode: 'keeper',
+    zoneRows: zoneGrid.rows,
+    zoneCols: zoneGrid.cols,
     goalX,
     goalY,
     goalW,
@@ -92,17 +107,18 @@ export function computeLayout(
   canvasWidth: number,
   canvasHeight: number,
   mode: CameraMode = 'shooter',
+  zoneGrid: ZoneGrid = PRO_ZONE_GRID,
 ): Layout {
   return mode === 'shooter'
-    ? computeShooterLayout(canvasWidth, canvasHeight)
-    : computeKeeperLayout(canvasWidth, canvasHeight);
+    ? computeShooterLayout(canvasWidth, canvasHeight, zoneGrid)
+    : computeKeeperLayout(canvasWidth, canvasHeight, zoneGrid);
 }
 
 export function zoneCenter(layout: Layout, zone: Zone): { x: number; y: number } {
-  const col = zone % 3;
-  const row = Math.floor(zone / 3);
-  const cellW = layout.goalW / 3;
-  const cellH = layout.goalH / 3;
+  const col = zone % layout.zoneCols;
+  const row = Math.floor(zone / layout.zoneCols);
+  const cellW = layout.goalW / layout.zoneCols;
+  const cellH = layout.goalH / layout.zoneRows;
   return {
     x: layout.goalX + cellW * col + cellW / 2,
     y: layout.goalY + cellH * row + cellH / 2,
@@ -110,13 +126,13 @@ export function zoneCenter(layout: Layout, zone: Zone): { x: number; y: number }
 }
 
 export function zoneFromPoint(layout: Layout, x: number, y: number): Zone | null {
-  const { goalX, goalY, goalW, goalH } = layout;
+  const { goalX, goalY, goalW, goalH, zoneRows, zoneCols } = layout;
   if (x < goalX || x > goalX + goalW || y < goalY || y > goalY + goalH) {
     return null;
   }
-  const col = Math.min(2, Math.floor(((x - goalX) / goalW) * 3));
-  const row = Math.min(2, Math.floor(((y - goalY) / goalH) * 3));
-  return (row * 3 + col) as Zone;
+  const col = Math.min(zoneCols - 1, Math.floor(((x - goalX) / goalW) * zoneCols));
+  const row = Math.min(zoneRows - 1, Math.floor(((y - goalY) / goalH) * zoneRows));
+  return (row * zoneCols + col) as Zone;
 }
 
 /** Project drag direction from penalty spot onto the goal to pick a zone. */

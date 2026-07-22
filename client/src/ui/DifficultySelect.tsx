@@ -4,17 +4,17 @@ const OPTIONS: { id: Difficulty; label: string; description: string }[] = [
   {
     id: 'beginner',
     label: 'Beginner',
-    description: 'AI picks obvious zones — easier to out-read.',
+    description: '3 goal zones (left, middle, right) — easier to read your opponent.',
   },
   {
     id: 'intermediate',
     label: 'Intermediate',
-    description: 'Balanced AI — mixes corners and centre.',
+    description: '6 goal zones (2 rows × 3 columns) — more options, still readable.',
   },
   {
     id: 'pro',
     label: 'Pro',
-    description: 'Smart AI — favours corners, harder to predict.',
+    description: '9 goal zones (full 3×3 grid) — hardest to predict.',
   },
 ];
 
@@ -31,8 +31,8 @@ export function DifficultySelect({ selected, onSelect, onBack, onStart }: Diffic
       <div className="text-center">
         <h2 className="font-display text-3xl font-bold">AI Difficulty</h2>
         <p className="mt-2 text-slate-300">
-          Only affects computer opponents in 1v1 and team mode. Online matches are always human
-          vs human.
+          Grid size follows difficulty in solo and team vs AI. Online 1v1 always uses the full 9-zone
+          grid; online team rooms use the host&apos;s chosen difficulty.
         </p>
       </div>
       <div className="grid gap-3">

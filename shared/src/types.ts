@@ -1,5 +1,10 @@
-/** 3x3 grid zone index (0-8), row-major: top-left=0, bottom-right=8 */
+/** Goal zone index (0..N-1), row-major: top-left=0 */
 export type Zone = 0 | 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8;
+
+export interface ZoneGrid {
+  rows: number;
+  cols: number;
+}
 
 /** Legacy outcomes — kept for backward compat */
 export type Outcome = 'GOAL' | 'SAVED' | 'MISSED';
@@ -29,6 +34,8 @@ export interface ZonePick {
 }
 
 export interface DifficultyConfig {
+  zoneRows: number;
+  zoneCols: number;
   saveChance: number;
   saveRadius: number;
   reactionMs: number;
@@ -84,8 +91,25 @@ export interface MatchState {
   history: RoundResult[];
 }
 
-export const ZONE_ROWS = 3;
-export const ZONE_COLS = 3;
+export const PRO_ZONE_GRID: ZoneGrid = { rows: 3, cols: 3 };
+/** @deprecated use PRO_ZONE_GRID.rows */
+export const ZONE_ROWS = PRO_ZONE_GRID.rows;
+/** @deprecated use PRO_ZONE_GRID.cols */
+export const ZONE_COLS = PRO_ZONE_GRID.cols;
+
+export function zoneCount(grid: ZoneGrid): number {
+  return grid.rows * grid.cols;
+}
+
+export function centerZone(grid: ZoneGrid): Zone {
+  const row = Math.floor((grid.rows - 1) / 2);
+  const col = Math.floor((grid.cols - 1) / 2);
+  return rowColToZone(row, col, grid.cols);
+}
+
+export function isValidZone(zone: number, grid: ZoneGrid): zone is Zone {
+  return Number.isInteger(zone) && zone >= 0 && zone < zoneCount(grid);
+}
 /** Kicks (or keeps) per side in 1v1 / online — 5 each = 10 duels total */
 export const ROUNDS_PER_ROLE = 5;
 export const MAX_DUELS = ROUNDS_PER_ROLE * 2;
@@ -101,17 +125,17 @@ export const DEFAULT_TEAM_PLAYERS = 3;
 /** @deprecated use DEFAULT_TEAM_PLAYERS */
 export const DEFAULT_TEAM_SIZE = DEFAULT_TEAM_PLAYERS;
 
-export function zoneToRowCol(zone: Zone): { row: number; col: number } {
-  return { row: Math.floor(zone / ZONE_COLS), col: zone % ZONE_COLS };
+export function zoneToRowCol(zone: Zone, cols: number = PRO_ZONE_GRID.cols): { row: number; col: number } {
+  return { row: Math.floor(zone / cols), col: zone % cols };
 }
 
-export function rowColToZone(row: number, col: number): Zone {
-  return (row * ZONE_COLS + col) as Zone;
+export function rowColToZone(row: number, col: number, cols: number = PRO_ZONE_GRID.cols): Zone {
+  return (row * cols + col) as Zone;
 }
 
-/** Chebyshev (king's move) distance on the 3x3 grid */
-export function zoneDistance(a: Zone, b: Zone): number {
-  const pa = zoneToRowCol(a);
-  const pb = zoneToRowCol(b);
+/** Chebyshev (king's move) distance on the goal grid */
+export function zoneDistance(a: Zone, b: Zone, grid: ZoneGrid = PRO_ZONE_GRID): number {
+  const pa = zoneToRowCol(a, grid.cols);
+  const pb = zoneToRowCol(b, grid.cols);
   return Math.max(Math.abs(pa.row - pb.row), Math.abs(pa.col - pb.col));
 }

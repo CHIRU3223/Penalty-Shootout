@@ -1,7 +1,9 @@
 import type { DifficultyConfig, DuelPoint, PlayerProfile, PlayerRole, Zone } from '@pk/shared';
 import {
+  centerZone,
   computeZoneDuel,
   duelPointLabel,
+  getZoneGridFromConfig,
   MAX_DUELS,
   PICK_CLOCK_SECONDS,
 } from '@pk/shared';
@@ -181,8 +183,9 @@ export class GameStateMachine {
 
   private finalizePicks(): void {
     const s = this.snapshot;
+    const defaultZone = centerZone(getZoneGridFromConfig(this.config.difficulty));
     if (!s.playerLocked) {
-      const zone = (s.playerPick ?? s.hoverZone ?? (4 as Zone)) as Zone;
+      const zone = (s.playerPick ?? s.hoverZone ?? defaultZone) as Zone;
       s.playerPick = zone;
       if (s.playerRole === 'shooter') s.kickZone = zone;
       else s.keepZone = zone;
@@ -208,8 +211,9 @@ export class GameStateMachine {
 
   private resolveDuel(): void {
     const s = this.snapshot;
-    const kick = s.kickZone ?? (4 as Zone);
-    const keep = s.keepZone ?? (4 as Zone);
+    const defaultZone = centerZone(getZoneGridFromConfig(this.config.difficulty));
+    const kick = s.kickZone ?? defaultZone;
+    const keep = s.keepZone ?? defaultZone;
     const winner = computeZoneDuel(kick, keep);
     s.lastPoint = duelPointLabel(winner);
 

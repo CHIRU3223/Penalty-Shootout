@@ -10,8 +10,9 @@ export function HowToPlay({ onBack }: HowToPlayProps) {
         <section>
           <h3 className="font-semibold text-white">Zone Duel</h3>
           <p>
-            The goal is split into 9 zones (3×3 grid). Each round, kicker and keeper both pick a
-            zone within 10 seconds.
+            The goal is split into zones. Difficulty sets the grid: Beginner uses 3 zones (left,
+            middle, right), Intermediate uses 6, and Pro uses the full 9-zone (3×3) grid. Each
+            round, kicker and keeper both pick a zone within 10 seconds.
           </p>
         </section>
         <section>

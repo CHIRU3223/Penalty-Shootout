@@ -1,29 +1,66 @@
-import type { DifficultyConfig, Dive, Shot, Zone } from './types.js';
-import { rowColToZone, zoneToRowCol } from './types.js';
+import type { DifficultyConfig, Dive, Shot, Zone, ZoneGrid } from './types.js';
+import {
+  centerZone,
+  rowColToZone,
+  zoneCount,
+  zoneToRowCol,
+} from './types.js';
+import { getZoneGridFromConfig } from './difficulty.js';
 import type { Rng } from './scoring.js';
-
-const CORNER_ZONES: Zone[] = [0, 2, 6, 8];
-const SIDE_ZONES: Zone[] = [1, 3, 5, 7];
-const ALL_ZONES: Zone[] = [0, 1, 2, 3, 4, 5, 6, 7, 8];
 
 export interface AiKeeperContext {
   /** Visible aim zone hint (e.g. from opponent's aim indicator). */
   aimTell?: Zone | null;
 }
 
-function pickRandomZone(rng: Rng): Zone {
-  return ALL_ZONES[Math.floor(rng() * ALL_ZONES.length)]!;
+function gridFromConfig(cfg: DifficultyConfig): ZoneGrid {
+  return getZoneGridFromConfig(cfg);
 }
 
-function neighborZones(zone: Zone): Zone[] {
-  const { row, col } = zoneToRowCol(zone);
+function allZones(grid: ZoneGrid): Zone[] {
+  return Array.from({ length: zoneCount(grid) }, (_, i) => i as Zone);
+}
+
+function cornerZones(grid: ZoneGrid): Zone[] {
+  if (grid.rows === 1) {
+    return [0, grid.cols - 1] as Zone[];
+  }
+  const lastRow = grid.rows - 1;
+  const lastCol = grid.cols - 1;
+  return [
+    rowColToZone(0, 0, grid.cols),
+    rowColToZone(0, lastCol, grid.cols),
+    rowColToZone(lastRow, 0, grid.cols),
+    rowColToZone(lastRow, lastCol, grid.cols),
+  ];
+}
+
+function sideZones(grid: ZoneGrid): Zone[] {
+  if (grid.rows === 1) {
+    return grid.cols >= 3 ? [1 as Zone] : allZones(grid);
+  }
+  const midCol = Math.floor((grid.cols - 1) / 2);
+  const out: Zone[] = [];
+  for (let row = 0; row < grid.rows; row++) {
+    out.push(rowColToZone(row, midCol, grid.cols));
+  }
+  return out;
+}
+
+function pickRandomZone(rng: Rng, grid: ZoneGrid): Zone {
+  const zones = allZones(grid);
+  return zones[Math.floor(rng() * zones.length)]!;
+}
+
+function neighborZones(zone: Zone, grid: ZoneGrid): Zone[] {
+  const { row, col } = zoneToRowCol(zone, grid.cols);
   const out: Zone[] = [];
   for (let r = -1; r <= 1; r++) {
     for (let c = -1; c <= 1; c++) {
       const nr = row + r;
       const nc = col + c;
-      if (nr >= 0 && nr < 3 && nc >= 0 && nc < 3) {
-        out.push(rowColToZone(nr, nc));
+      if (nr >= 0 && nr < grid.rows && nc >= 0 && nc < grid.cols) {
+        out.push(rowColToZone(nr, nc, grid.cols));
       }
     }
   }
@@ -40,6 +77,7 @@ export function pickKeeperDive(
   rng: Rng = Math.random,
   ctx: AiKeeperContext = {},
 ): Dive {
+  const grid = gridFromConfig(cfg);
   let target = shot.zone;
 
   if (ctx.aimTell != null && rng() < cfg.shooterAccuracy * 0.85) {
@@ -47,12 +85,12 @@ export function pickKeeperDive(
   } else if (rng() < cfg.saveChance) {
     target = shot.zone;
   } else {
-    const pool = neighborZones(shot.zone);
-    target = pool[Math.floor(rng() * pool.length)] ?? pickRandomZone(rng);
+    const pool = neighborZones(shot.zone, grid);
+    target = pool[Math.floor(rng() * pool.length)] ?? pickRandomZone(rng, grid);
   }
 
   if (cfg.saveRadius > 0 && rng() > cfg.saveChance && rng() < 0.35) {
-    const adj = neighborZones(target).filter((z) => z !== shot.zone);
+    const adj = neighborZones(target, grid).filter((z) => z !== shot.zone);
     if (adj.length > 0) {
       target = adj[Math.floor(rng() * adj.length)]!;
     }
@@ -66,17 +104,20 @@ export function pickKeeperDive(
  * shooterAccuracy drives corner preference and power consistency.
  */
 export function pickShooterShot(cfg: DifficultyConfig, rng: Rng = Math.random): Shot {
+  const grid = gridFromConfig(cfg);
   const acc = cfg.shooterAccuracy;
   let zone: Zone;
 
   if (rng() < acc * 0.75) {
-    zone = CORNER_ZONES[Math.floor(rng() * CORNER_ZONES.length)]!;
+    const corners = cornerZones(grid);
+    zone = corners[Math.floor(rng() * corners.length)]!;
   } else if (rng() < acc) {
-    zone = SIDE_ZONES[Math.floor(rng() * SIDE_ZONES.length)]!;
+    const sides = sideZones(grid);
+    zone = sides[Math.floor(rng() * sides.length)]!;
   } else if (rng() < 0.5) {
-    zone = 4;
+    zone = centerZone(grid);
   } else {
-    zone = pickRandomZone(rng);
+    zone = pickRandomZone(rng, grid);
   }
 
   const powerBase = 0.35 + acc * 0.45;

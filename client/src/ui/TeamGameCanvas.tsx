@@ -1,5 +1,6 @@
 import { useEffect, useRef } from 'react';
 import type { PlayerRole } from '@pk/shared';
+import { getZoneGrid } from '@pk/shared';
 import {
   createCameraState,
   getActiveLayout,
@@ -62,7 +63,8 @@ export function TeamGameCanvas({ active }: TeamGameCanvasProps) {
     const ball = createBallState();
     const anim = { animStarted: false };
     const lastRole = { value: 'shooter' as PlayerRole };
-    let camera = createCameraState(canvas.width, canvas.height, 'shooter');
+    const zoneGrid = getZoneGrid(difficulty);
+    let camera = createCameraState(canvas.width, canvas.height, 'shooter', zoneGrid);
     let layout = getActiveLayout(camera);
 
     const keeper = createKeeperState(

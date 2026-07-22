@@ -1,5 +1,6 @@
 import { useEffect, useRef } from 'react';
 import type { PlayerRole, ServerToClientMessage, TeamTurnStartMessage } from '@pk/shared';
+import { getZoneGrid } from '@pk/shared';
 import {
   createCameraState,
   getActiveLayout,
@@ -34,6 +35,7 @@ interface OnlineTeamGameCanvasProps {
 export function OnlineTeamGameCanvas({ active }: OnlineTeamGameCanvasProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
+  const teamLobby = useAppStore((s) => s.teamLobby);
   const setHud = useAppStore((s) => s.setHud);
   const setWinner = useAppStore((s) => s.setWinner);
   const setScreen = useAppStore((s) => s.setScreen);
@@ -53,7 +55,8 @@ export function OnlineTeamGameCanvas({ active }: OnlineTeamGameCanvasProps) {
     const ball = createBallState();
     const anim = { animStarted: false };
     const lastRole = { value: 'shooter' as PlayerRole };
-    let camera = createCameraState(canvas.width, canvas.height, 'shooter');
+    const zoneGrid = getZoneGrid(teamLobby.difficulty);
+    let camera = createCameraState(canvas.width, canvas.height, 'shooter', zoneGrid);
     let layout = getActiveLayout(camera);
 
     const keeper = createKeeperState(
@@ -263,7 +266,7 @@ export function OnlineTeamGameCanvas({ active }: OnlineTeamGameCanvasProps) {
       offMsg();
       observer.disconnect();
     };
-  }, [active, setHud, setScreen, setWinner, soundEnabled]);
+  }, [active, setHud, setScreen, setWinner, soundEnabled, teamLobby.difficulty]);
 
   return (
     <div ref={containerRef} className="relative h-full min-h-[420px] w-full flex-1">

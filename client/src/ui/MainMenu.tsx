@@ -28,7 +28,7 @@ export function MainMenu({
         <p className="mb-2 text-sm uppercase tracking-[0.35em] text-gold">Penalty Shootout</p>
         <h1 className="font-display text-5xl font-bold sm:text-6xl">Penalty Kings</h1>
         <p className="mt-4 max-w-md text-slate-300">
-          Mind-game zone duels — kicker and keeper pick a goal square. Same zone = keeper point.
+          Mind-game zone duels — kicker and keeper pick a goal zone. Same zone = keeper point.
           Different = kicker point.
         </p>
         <button

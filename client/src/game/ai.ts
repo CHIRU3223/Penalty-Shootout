@@ -1,5 +1,11 @@
 import type { Difficulty, DifficultyConfig, Dive, Shot, Zone } from '@pk/shared';
-import { getDifficultyConfig, pickKeeperDive, pickShooterShot } from '@pk/shared';
+import {
+  getDifficultyConfig,
+  getZoneGridFromConfig,
+  pickKeeperDive,
+  pickShooterShot,
+  zoneCount,
+} from '@pk/shared';
 
 export interface AiOpponent {
   pickDive: (shot: Shot, aimTell?: Shot['zone'] | null) => Dive;
@@ -7,18 +13,18 @@ export interface AiOpponent {
   pickZone: (role: 'shooter' | 'keeper') => Zone;
 }
 
-const CORNER_ZONES: Zone[] = [0, 2, 6, 8];
-
 export function pickKickerZone(cfg: DifficultyConfig): Zone {
   const shot = pickShooterShot(cfg);
   return shot.zone;
 }
 
 export function pickKeeperZone(cfg: DifficultyConfig): Zone {
+  const grid = getZoneGridFromConfig(cfg);
+  const count = zoneCount(grid);
   if (Math.random() < cfg.saveChance * 0.5) {
-    return CORNER_ZONES[Math.floor(Math.random() * CORNER_ZONES.length)]!;
+    return Math.floor(Math.random() * count) as Zone;
   }
-  return Math.floor(Math.random() * 9) as Zone;
+  return Math.floor(Math.random() * count) as Zone;
 }
 
 export function createAiOpponent(difficulty: Difficulty): AiOpponent {

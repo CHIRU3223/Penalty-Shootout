@@ -7,8 +7,11 @@ import type {
 } from '@pk/shared';
 import {
   applyTeamTurn,
+  centerZone,
   createTeamMatchState,
   getTeamTurnPairing,
+  getZoneGrid,
+  isValidZone,
   pickAiZone,
   pickFamousFootballerNames,
   PICK_CLOCK_SECONDS,
@@ -446,13 +449,14 @@ export function handleTeamPickClock(
   lobby: TeamLobby,
 ): ServerToClientMessage | null {
   if (!lobby.match) return null;
-  if (lobby.match.pendingKickZone === null) lobby.match.pendingKickZone = 4 as Zone;
-  if (lobby.match.pendingKeepZone === null) lobby.match.pendingKeepZone = 4 as Zone;
+  const defaultZone = centerZone(getZoneGrid(lobby.difficulty));
+  if (lobby.match.pendingKickZone === null) lobby.match.pendingKickZone = defaultZone;
+  if (lobby.match.pendingKeepZone === null) lobby.match.pendingKeepZone = defaultZone;
   return tryResolveTeamTurn(store, lobby);
 }
 
-export function validateTeamZone(zone: number): zone is Zone {
-  return Number.isInteger(zone) && zone >= 0 && zone <= 8;
+export function validateTeamZone(zone: number, difficulty: Difficulty): zone is Zone {
+  return isValidZone(zone, getZoneGrid(difficulty));
 }
 
 export function isTeamMessage(type: string): boolean {
@@ -502,8 +506,9 @@ export function resolveTeamPickClock(
   onExpire: () => void,
 ): void {
   if (!lobby.match) return;
-  if (lobby.match.pendingKickZone === null) lobby.match.pendingKickZone = 4 as Zone;
-  if (lobby.match.pendingKeepZone === null) lobby.match.pendingKeepZone = 4 as Zone;
+  const defaultZone = centerZone(getZoneGrid(lobby.difficulty));
+  if (lobby.match.pendingKickZone === null) lobby.match.pendingKickZone = defaultZone;
+  if (lobby.match.pendingKeepZone === null) lobby.match.pendingKeepZone = defaultZone;
   const msg = tryResolveTeamTurn(store, lobby);
   if (msg) emitTurnResultAndContinue(store, lobby, io, msg, onExpire);
 }
