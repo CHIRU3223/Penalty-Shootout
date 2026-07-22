@@ -4,7 +4,15 @@ import type {
 } from '@pk/shared';
 import { io, type Socket } from 'socket.io-client';
 
-const SERVER_URL = import.meta.env.VITE_SERVER_URL ?? 'http://localhost:3001';
+const SERVER_URL = resolveServerUrl();
+
+function resolveServerUrl(): string {
+  const raw = import.meta.env.VITE_SERVER_URL ?? 'http://localhost:3001';
+  if (raw.startsWith('http://') || raw.startsWith('https://')) {
+    return raw.replace(/\/$/, '');
+  }
+  return `https://${raw.replace(/\/$/, '')}`;
+}
 
 let socket: Socket | null = null;
 

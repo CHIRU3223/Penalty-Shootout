@@ -1,0 +1,43 @@
+# Render Blueprint — Penalty Kings
+# Dashboard: New > Blueprint > connect this repo, or add as render.yaml at repo root.
+#
+# After first deploy, online play needs:
+# - VITE_SERVER_URL on the static site (auto-linked below)
+# - CLIENT_ORIGIN on the API (auto-linked below)
+
+services:
+  # Socket.IO game server
+  - type: web
+    name: penalty-kings-api
+    runtime: docker
+    plan: free
+    dockerfilePath: ./server/Dockerfile
+    dockerContext: .
+    healthCheckPath: /health
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: CLIENT_ORIGIN
+        fromService:
+          type: web
+          name: penalty-kings-web
+          property: host
+
+  # Static React client
+  - type: web
+    name: penalty-kings-web
+    runtime: static
+    buildCommand: npm ci && npm run build -w shared && npm run build -w client
+    staticPublishPath: client/dist
+    envVars:
+      - key: NODE_VERSION
+        value: "22"
+      - key: VITE_SERVER_URL
+        fromService:
+          type: web
+          name: penalty-kings-api
+          property: host
+    routes:
+      - type: rewrite
+        source: /*
+        destination: /index.html
